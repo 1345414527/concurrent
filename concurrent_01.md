@@ -1944,7 +1944,7 @@ public static void main(String[] args) {
 
   不公平：
 
-  ![](assets/image-20220108151801028.png)
+  ![](./assets/image-20220108151801028.png)
 
   公平：
 
