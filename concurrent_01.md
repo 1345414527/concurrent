@@ -80,7 +80,7 @@
 
 # java线程
 
-## 创建和运行线程⭐
+## 创建和运行线程
 
 ### 方法一，直接使用 Thread
 
@@ -1944,7 +1944,7 @@ public static void main(String[] args) {
 
   不公平：
 
-  ![](assets/image-20220108151801028.png)
+  ![](./assets/image-20220108151801028.png)
 
   公平：
 
