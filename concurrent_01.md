@@ -2611,7 +2611,7 @@ private void doSignalAll(Node first) {
 
 思考：
 
-1. sleep,yield    
+1. sleep, yield    
 
 2. wait/notify
 
