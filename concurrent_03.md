@@ -1,4 +1,4 @@
-前言：文中出现的示例代码地址为：[gitee代码地址](https://gitee.com/gu_chun_bo/java-construct/tree/master/java%E5%B9%B6%E5%8F%91%E7%BC%96%E7%A8%8B/jdk8)
+
 
 #  共享模型之工具
 
@@ -750,9 +750,19 @@ boolean awaitTermination(long timeout, TimeUnit unit) throws InterruptedExceptio
   - 例如 4 核 CPU 计算时间是 10% ，其它等待时间是 90%，期望 cpu 被 100% 利用，套用公式
     4 * 100% * 100% / 10% = 40
 
+#### 阻塞队列
 
+**ArrayBlockingQueue**，由数组组成的有界阻塞队列，默认情况下不保证线程公平。
 
+**LinkedBlockingQueue**，由链表组成的有界阻塞队列，队列的默认和最大长度为 Integer 最大值。
 
+**PriorityBlockingQueue**，支持优先级的无界阻塞队列，默认情况下元素按升序排序。可自定义 `compareTo` 方法指定排序规则，或者初始化时指定 Comparator 排序，不能保证同优先级元素的顺序。
+
+**DelayQueue**，支持延时获取元素的无界阻塞队列，使用优先级队列实现。创建元素时可以指定多久才能从队列中获取当前元素，只有延迟期满时才能从队列中获取元素，适用于缓存和定时调度。
+
+**SynchronousQueue**，不存储元素的阻塞队列，每一个 put 必须等待一个 take。默认使用非公平策略，适用于传递性场景，吞吐量高。
+
+LinkedBlockingDeque，链表组成的双向阻塞队列，可从队列的两端插入和移出元素，多线程同时入队时减少了竞争。
 
 #### 正确处理执行任务异常
 
@@ -964,19 +974,6 @@ class AddTask3 extends RecursiveTask<Integer> {
 逻辑图
 
 ![1594997724368](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200718091923-301108.png)
-
-
-
-### ThreadLocal
-
-提供线程内的局部变量，不同的线程之间不会相互干扰，这种变量在线程的生命周期内起作用，减少同一个线程内多个函数或组件之间一些公共变量传递的复杂度。
-
-ThreadLoacl 有一个静态内部类 ThreadLocalMap，其 Key 是 ThreadLocal 对象，值是 Entry 对象，Entry 中只有一个 Object 类的 vaule 值。ThreadLocal 是线程共享的，但 ThreadLocalMap 是每个线程私有的。ThreadLocal 主要有 set、get 和 remove 三个方法。
-
-|        | synchronized                                                 | ThreadLocal                                                  |
-| ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
-| 原理   | 同步机制采用’以时间换空间’的方式, 只提供了一份变量,让不同的线程排队访问 | ThreadLocal采用’以空间换时间’的方式, 为每一个线程都提供了一份变量的副本,从而实现同时访问而相不干扰 |
-| 侧重点 | 多个线程之间访问资源的同步性                                 | 多线程中让每个线程之间的数据相互隔离                         |
 
 
 
@@ -2536,7 +2533,7 @@ CountDownLatch是基于AQS实现,state 值为 count。当线程使用countDown�
 
 ### CyclicBarrier
 
-CyclicBarrier循环栅栏，用来进行线程协作，等待线程满足某个计数。构造时设置『计数个数』，每个线程执行到某个需要“同步”的时刻调用 await() 方法进行等待，当等待的线程数满足『计数个数』时，继续执行。
+CyclicBarrier循环屏障是基于同步到达某个点的信号量触发机制，每个线程调用 `await` 方法表示自己已到达屏障，然后被阻塞，当count=0时，继续执行。
 
 跟CountdownLatch一样，但这个可以重用。即当count=0时，下次使用count恢复为parties。
 
@@ -2651,9 +2648,11 @@ public class ExchangerTest {
    > 2. 求大小弱一致性，size 操作未必是 100% 准确
    > 3. 读取弱一致性
 
-对于非安全容器来讲，如果遍历时如果发生了修改，使用`fail-fast`机制让遍历立刻失败，抛出`ConcurrentModificationException`，不再继续遍历
+对于线程不安全的容器，遍历时发生了修改，使用fail-fast(快速失败)机制，即抛出异常(ConcurrentModificationException)不再遍历。
 
+对于线程安全的容器，遍历时发生了修改，使用fail-safe(安全失败)机制，即在旧副本上遍历，无法读取最新数据，与CAP 理论中 C（一致性） 和 A（可用性） 的矛盾。JUC下的容器都使用fail-safe机制。
 
+>弱一致性并不是不好：数据库的 MVCC 都是弱一致性的表现；并发高和一致性是矛盾的，需要权衡
 
 
 
@@ -3716,7 +3715,7 @@ return x;
 
 #####  加锁分析
 
-==高明之处==在于用了两把锁和 dummy 节点
+LinkedBlockingQueue是一个基于链表的阻塞队列，==高明之处==在于用了两把锁和 dummy 节点
 
 1. 用一把锁，同一时刻，最多只允许有一个线程（生产者或消费者，二选一）执行
 2. 用两把锁，同一时刻，可以允许两个线程同时（一个生产者与一个消费者）执行

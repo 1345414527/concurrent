@@ -538,7 +538,7 @@ class TwoParseTermination{
 
 ### sleep，yiled，wait，join 对比
 
-1. sleep，join，yield，interrupted是Thread类中的方法
+1. sleep，join，yield是Thread类中的方法
 2. wait/notify是object中的方法，需要和synchronized一起使用
 
 - sleep 不释放锁、释放cpu
@@ -551,6 +551,8 @@ class TwoParseTermination{
 ##   守护线程
 
 默认情况下，java进程需要等待所有的线程结束后才会停止，但是有一种特殊的线程，叫做守护线程，在其他线程全部结束的时候即使守护线程还未结束代码未执行完java进程也会停止。
+
+守护线程是一种支持型线程，可以通过 `setDaemon(true)` 将线程设置为守护线程，但必须在线程启动前设置。
 
 * 当主线程死亡后，守护线程会跟着死亡
 * 可以帮助做一些辅助性的东西，如“心跳检测”
@@ -585,13 +587,12 @@ class TwoParseTermination{
 
 ![1583507709834](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200307093352-614933.png)
 
-1. NEW 跟五种状态里的初始状态是一个意思
+1. NEW：新建状态，线程被创建且未启动，还未调用 `start`  方法。
 
-2. RUNNABLE 是当调用了 `start()` 方法之后的状态，注意，Java API 层面的 `RUNNABLE` 状态涵盖了操作系统层面的【就绪状态】、【运行状态】和【阻塞状态(os层面的阻塞状态/IO阻塞状态】（由于 BIO 导致的线程阻塞，在 Java 里无法区分，仍然认为是可运行）
+2. RUNNABLE ：当调用了 `start()` 方法之后的状态，注意，Java API 层面的 `RUNNABLE` 状态涵盖了操作系统层面的【就绪状态】、【运行状态】和【阻塞状态(os层面的阻塞状态/IO阻塞状态】（由于 BIO 导致的线程阻塞，在 Java 里无法区分，仍然认为是可运行）
 
 3. `BLOCKED` ， `WAITING` ， `TIMED_WAITING` 都是 Java API 层面对【阻塞状态】的细分，后面会在状态转换一节详述
-
-   - BLOCKED：锁
+- BLOCKED：锁
    - WAITING：wait(),join(),park()
    - TIME_WAITING：sleep(100),wait(100),join(100),parkNanos(100),parkUntil(100)
 
@@ -647,7 +648,16 @@ class TwoParseTermination{
    2. 调用 LockSupport.unpark(目标线程) 或调用了线程 的 interrupt() ，或是等待超时，会让目标线程从
       TIMED_WAITING--> RUNNABLE
 
+## ThreadLocal
 
+提供线程内的局部变量，不同的线程之间不会相互干扰，这种变量在线程的生命周期内起作用，减少同一个线程内多个函数或组件之间一些公共变量传递的复杂度。
+
+ThreadLoacl 有一个静态内部类 ThreadLocalMap，其 Key 是 ThreadLocal 对象，值是 Entry 对象，Entry 中只有一个 Object 类的 vaule 值。ThreadLocal 是线程共享的，但 ThreadLocalMap 是每个线程私有的。ThreadLocal 主要有 set、get 和 remove 三个方法。
+
+|        | synchronized                                                 | ThreadLocal                                                  |
+| ------ | ------------------------------------------------------------ | ------------------------------------------------------------ |
+| 原理   | 同步机制采用’以时间换空间’的方式, 只提供了一份变量,让不同的线程排队访问 | ThreadLocal采用’以空间换时间’的方式, 为每一个线程都提供了一份变量的副本,从而实现同时访问而相不干扰 |
+| 侧重点 | 多个线程之间访问资源的同步性                                 | 多线程中让每个线程之间的数据相互隔离                         |
 
 
 
@@ -1295,7 +1305,7 @@ public static void method2() {
 
    ![1583757586447](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200309203947-654193.png)
    
-3. 当Thread-0 推出synchronized同步块时，使用cas将Mark Word的值恢复给对象头，失败，那么会进入重量级锁的解锁过程，即按照Monitor的地址找到Monitor对象，将Owner设置为null，唤醒EntryList 中的Thread-1线程
+3. 当Thread-0 退出synchronized同步块时，使用cas将Mark Word的值恢复给对象头，失败，那么会进入重量级锁的解锁过程，即按照Monitor的地址找到Monitor对象，将Owner设置为null，唤醒EntryList 中的Thread-1线程
 
    
 
@@ -1316,7 +1326,7 @@ public static void method2() {
 
 #### 偏向锁
 
-在轻量级的锁中，我们可以发现，如果同一个线程对同一个2对象进行重入锁时，也需要执行CAS操作，这是有点耗时滴，那么java6开始引入了偏向锁的东东，只有第一次使用CAS时将对象的Mark Word头设置为入锁线程ID，**之后这个入锁线程再进行重入锁时，发现线程ID是自己的，那么就不用再进行CAS了。**
+在轻量级的锁中，我们可以发现，如果同一个线程对同一个2对象进行重入锁时，也需要执行CAS操作，这是有点耗时，那么java6开始引入了偏向锁的，只有第一次使用CAS时将对象的Mark Word头设置为入锁线程ID，**之后这个入锁线程再进行重入锁时，发现线程ID是自己的，那么就不用再进行CAS了。**
 
 ![1583760728806](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200309213209-28609.png)
 
@@ -1408,7 +1418,7 @@ biasedLockFlag (1bit): 0
 
 ###### 其它线程使用对象，批量重偏向，批量撤销
 
-`在没有发生竞争的情况下，当另一个线程获取对象锁时，偏向锁就会上升为轻量锁。`(可以理解为本来是偏向Thread-1的，现在Thread-2获得了对象锁，就撤销了对Thread-1的偏向，变为轻量级锁)(在发生竞争的情况下，依然是上升为重量所)
+`在没有发生竞争的情况下，当另一个线程获取对象锁时，偏向锁就会上升为轻量锁。`(可以理解为本来是偏向Thread-1的，现在Thread-2获得了对象锁，就撤销了对Thread-1的偏向，变为轻量级锁)(在发生竞争的情况下，依然是上升为重量锁)
 
 `批量重偏向`：**如果超过20个对象对同一个线程如Thread-1撤销偏向时，那么第20个及以后的对象可以将撤销对Thread-1的偏向变为偏向Thread-2。**
 
@@ -1691,8 +1701,6 @@ public static void method3() {
 - lock.lockInterruptibly();是可以打断的。
 
 - lock.lock()是不可以打断的。
-
-
 
 lock.lockInterruptibly()底层会调用：
 
@@ -2186,7 +2194,7 @@ static final class NonfairSync extends Sync {
 
 #### 可打断
 
-不可打断模式：在此模式下，即使它被打断，仍会驻留在 AQS 队列中，一直要等到获得锁后方能得知自己被打断了
+不可打断模式：在此模式下，即使它被打断，仍会驻留在 AQS 队列中，一直要等到获得锁后方能得知自己被打断了，仅仅是设置了打断标记
 
 ```java
 // Sync 继承自 AQS

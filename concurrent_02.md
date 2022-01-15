@@ -4,11 +4,9 @@
 
 ## Java 内存模型
 
-JMM 即 Java Memory Model，它从java层面定义了主存、工作内存抽象概念，底层对应着 CPU 寄存器、缓存、硬件内存、CPU 指令优化等。JMM 体现在以下几个方面
+JMM 规定所有变量都存储在主内存，每条线程有自己的工作内存，工作内存中保存变量的主内存副本，线程对变量的所有操作都必须在工作内存进行，不能直接读写主内存。
 
-1. 原子性 - 保证指令不会受到线程上下文切换的影响
-2. 可见性 - 保证指令不会受 cpu 缓存的影响
-3. 有序性 - 保证指令不会受 cpu 指令并行优化的影响
+JMM 基本原则：只要不改变程序执行结果，编译器和处理器怎么优化都行。
 
 
 
@@ -216,7 +214,7 @@ volatile 的底层实现原理是内存屏障，Memory Barrier（Memory Fence）
 
 #### 如何保证有序性
 
-1. 写屏障会确保指令重排序时，**不会将写屏障之前的代码排在写屏障之后**
+1. 写屏障会确保指令重排序时，**不会将写屏障之后的代码排在写屏障之前**
 
    ```java
    public void actor2(I_R esult r) {
@@ -226,7 +224,7 @@ volatile 的底层实现原理是内存屏障，Memory Barrier（Memory Fence）
    }
    ```
 
-2. 读屏障会确保指令重排序时，不会将读屏障之后的代码排在读屏障之前
+2. 读屏障会确保指令重排序时，**不会将读屏障之后的代码排在读屏障之前**
 
    ```java
    public void actor1(I_Result r) {
@@ -687,8 +685,7 @@ class AccountSafe implements Account{
 
 在上面代码中的AtomicInteger，保存值的value属性使用了volatile 。获取共享变量时，为了保证该变量的可见性，需要使用 volatile 修饰。
 
-它可以用来修饰**成员变量和静态成员变量**，他可以避免线程从自己的工作缓存中查找变量的值，必须到主存中获取
-它的值，线程操作 volatile 变量都是直接操作主存。即一个线程对 volatile 变量的修改，对另一个线程可见。
+它可以用来修饰**成员变量和静态成员变量**，他可以避免线程从自己的工作缓存中查找变量的值，必须到主存中获取它的值，线程操作 volatile 变量都是直接操作主存。即一个线程对 volatile 变量的修改，对另一个线程可见。
 
 > 再提一嘴
 > volatile 仅仅保证了共享变量的可见性，让其它线程能够看到最新值，但不能解决指令交错问题（不能保证原子性）
@@ -1179,7 +1176,7 @@ LongAdder 类有几个关键域
 ```java
 // 累加单元数组, 懒惰初始化
 transient volatile Cell[] cells;
-// 基础值, 如果没有竞争, 则用 cas 累加这个域
+// 基础值, 如果没有cells且当前线程无法创建，且没有竞争, 则用 cas 累加这个域
 transient volatile long base;
 // 在 cells 创建或扩容时, 置为 1, 表示加锁
 transient volatile int cellsBusy;
@@ -1265,12 +1262,10 @@ static final class Cell {
 
 ![1594821188387](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200716135941-626948.png)
 
-因为 Cell 是数组形式，在内存中是连续存储的，一个 Cell 为 24 字节（16 字节的对象头和 8 字节的 value），因
-此缓存行可以存下 2 个的 Cell 对象。这样问题来了：
+因为 Cell 是数组形式，在内存中是连续存储的，一个 Cell 为 24 字节（16 字节的对象头和 8 字节的 value），因此缓存行可以存下 2 个的 Cell 对象。这样问题来了：
 Core-0 要修改 Cell[0]，Core-1 要修改 Cell[1]
 
-无论谁修改成功，都会导致对方 Core 的缓存行失效，比如 Core-0 中 Cell[0]=6000, Cell[1]=8000 要累加
-Cell[0]=6001, Cell[1]=8000 ，这时会让 Core-1 的缓存行失效，@sun.misc.Contended 用来解决这个问题，它的原理是在使用此注解的对象或字段的前后各增加 128 字节大小的padding，从而让 CPU 将对象预读至缓存时占用不同的缓存行，这样，不会造成对方缓存行的失效
+无论谁修改成功，都会导致对方 Core 的缓存行失效，比如 Core-0 中 Cell[0]=6000, Cell[1]=8000 要累加Cell[0]=6001, Cell[1]=8000 ，这时会让 Core-1 的缓存行失效，@sun.misc.Contended 用来解决这个问题，它的原理是在使用此注解的对象或字段的前后各增加 128 字节大小的padding，从而让 CPU 将对象预读至缓存时占用不同的缓存行，这样，不会造成对方缓存行的失效
 
 ![1594821225708](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200716135939-234417.png)
 
@@ -1314,61 +1309,61 @@ add 流程图
 
 
 ```java
-  final void longAccumulate(long x, LongBinaryOperator fn,
-                              boolean wasUncontended) {
-        int h;
-        // 当前线程还没有对应的 cell, 需要随机生成一个 h 值用来将当前线程绑定到 cell
-        if ((h = getProbe()) == 0) {
-            // 初始化 probe
-            ThreadLocalRandom.current();
-            // h 对应新的 probe 值, 用来对应 cell
-            h = getProbe();
-            wasUncontended = true;
-        }
-        // collide 为 true 表示需要扩容
-        boolean collide = false;
-        for (;;) {
-            Cell[] as; Cell a; int n; long v;
-            // 已经有了 cells
-            if ((as = cells) != null && (n = as.length) > 0) {
-                // 但是还没有当前线程对应的 cell
-                if ((a = as[(n - 1) & h]) == null) {
-                    // 为 cellsBusy 加锁, 创建 cell, cell 的初始累加值为 x
-                    // 成功则 break, 否则继续 continue 循环
-                    if (cellsBusy == 0) {       // Try to attach new Cell
-                        Cell r = new Cell(x);   // Optimistically create
-                        if (cellsBusy == 0 && casCellsBusy()) {
-                            boolean created = false;
-                            try {               // Recheck under lock
-                                Cell[] rs; int m, j;
-                                if ((rs = cells) != null &&
-                                    (m = rs.length) > 0 &&
-                                    // 判断槽位确实是空的
-                                    rs[j = (m - 1) & h] == null) {
-                                    rs[j] = r;
-                                    created = true;
-                                }
-                            } finally {
-                                cellsBusy = 0;
+final void longAccumulate(long x, LongBinaryOperator fn,
+                          boolean wasUncontended) {
+    int h;
+    // 当前线程还没有对应的 cell, 需要随机生成一个 h 值用来将当前线程绑定到 cell
+    if ((h = getProbe()) == 0) {
+        // 初始化 probe
+        ThreadLocalRandom.current();
+        // h 对应新的 probe 值, 用来对应 cell
+        h = getProbe();
+        wasUncontended = true;
+    }
+    // collide 为 true 表示需要扩容
+    boolean collide = false;
+    for (;;) {
+        Cell[] as; Cell a; int n; long v;
+        // 已经有了 cells
+        if ((as = cells) != null && (n = as.length) > 0) {
+            // 但是还没有当前线程对应的 cell
+            if ((a = as[(n - 1) & h]) == null) {
+                // 为 cellsBusy 加锁, 创建 cell, cell 的初始累加值为 x
+                // 成功则 break, 否则继续 continue 循环
+                if (cellsBusy == 0) {       // Try to attach new Cell
+                    Cell r = new Cell(x);   // Optimistically create
+                    if (cellsBusy == 0 && casCellsBusy()) {
+                        boolean created = false;
+                        try {               // Recheck under lock
+                            Cell[] rs; int m, j;
+                            if ((rs = cells) != null &&
+                                (m = rs.length) > 0 &&
+                                // 判断槽位确实是空的
+                                rs[j = (m - 1) & h] == null) {
+                                rs[j] = r;
+                                created = true;
                             }
-                            if (created)
-                                break;
-                            continue;           // Slot is now non-empty
+                        } finally {
+                            cellsBusy = 0;
                         }
+                        if (created)
+                            break;
+                        continue;           // Slot is now non-empty
+                    }
                 }
                 // 有竞争, 改变线程对应的 cell 来重试 cas
                 else if (!wasUncontended)
                     wasUncontended = true;
-                    // cas 尝试累加, fn 配合 LongAccumulator 不为 null, 配合 LongAdder 为 null
+                // cas 尝试累加, fn 配合 LongAccumulator 不为 null, 配合 LongAdder 为 null
                 else if (a.cas(v = a.value, ((fn == null) ? v + x : fn.applyAsLong(v, x))))
                     break;
-                    // 如果 cells 长度已经超过了最大长度, 或者已经扩容, 改变线程对应的 cell 来重试 cas
+                // 如果 cells 长度已经超过了最大长度, 或者已经扩容, 改变线程对应的 cell 来重试 cas
                 else if (n >= NCPU || cells != as)
                     collide = false;
-                    // 确保 collide 为 false 进入此分支, 就不会进入下面的 else if 进行扩容了
+                // 确保 collide 为 false 进入此分支, 就不会进入下面的 else if 进行扩容了
                 else if (!collide)
                     collide = true;
-                    // 加锁
+                // 加锁
                 else if (cellsBusy == 0 && casCellsBusy()) {
                     // 加锁成功, 扩容
                     continue;
@@ -1714,23 +1709,3 @@ public final class String
 
 
 
-2. 
-
-## 本章小结
-
-1. 不可变类使用
-2. 不可变类设计
-3. 原理方面：final
-4. 模式方面
-   1. 享元模式-> 设置线程池
-
-
-
-
-
-
-
-# 问题
-
-1. 什么时候将导致用户态到内核态的转变？在synchroniezed进行加锁的时候。
-2. final是怎么优化读取速度的？复习完jvm再看就懂了。[视频](https://www.bilibili.com/video/BV16J411h7Rd?p=197)
