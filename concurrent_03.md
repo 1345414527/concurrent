@@ -23,7 +23,7 @@
 1. 步骤1：自定义拒绝策略接口
 
    ```java
-   @FunctionalInterface // 拒绝策略
+   @FunctionalInterface //拒绝策略
    interface RejectPolicy<T> {
        void reject(BlockingQueue<T> queue, T task);
    }

@@ -29,7 +29,7 @@ public class Test1 {
         t.start();
         utils.sleep(1);
         System.out.println(3434);   
-        run = false; // 线程t不会如预想的停下来
+        run = false;  // 线程t不会如预想的停下来
     }
 }
 ```
