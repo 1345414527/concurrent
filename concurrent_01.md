@@ -358,6 +358,8 @@ join可以理解成插队，能保证一个线程在另一个线程之前完成�
 ![](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200306163734-131567.png)
 
 > 应用：同步
+>
+> [(16条消息) JAVA多线程：狂抓 join()方法到底会不会释放锁，给你彻底介绍清楚（三）_血煞长虹的博客-CSDN博客_java join会释放锁吗](https://blog.csdn.net/succing/article/details/123023851?spm=1001.2101.3001.6661.1&utm_medium=distribute.pc_relevant_t0.none-task-blog-2~default~CTRLIST~Rate-1.pc_relevant_paycolumn_v3&depth_1-utm_source=distribute.pc_relevant_t0.none-task-blog-2~default~CTRLIST~Rate-1.pc_relevant_paycolumn_v3&utm_relevant_index=1)
 
 
 
@@ -1133,7 +1135,7 @@ public abstract class Test {
 
 ### Java 对象头
 
-以 32 位虚拟机为例,普通对象的对象头结构如下，其中的Klass Word为指针，指向对应的Class对象；
+以 32 位虚拟机为例,普通对象的对象头结构如下，其中的Klass Word为指针，指向对应的Class元数据；
 
 ![1583651065372](https://gitee.com/gu_chun_bo/picture/raw/master/image/20200308223951-617147.png)
 
